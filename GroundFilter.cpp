@@ -22,6 +22,47 @@
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/Search_traits_3.h>
 
+// -- CGAL other
+typedef CGAL::Search_traits_3<Kernel> TreeTraits;
+typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
+typedef Neighbor_search::Tree Tree;
+
+
+// TODO
+/*
+ * This seems overcomplicated, try to keep things as simple as possible. The simplest (and fastest) approach would be to
+1) define the virtual grid where each cell can hold one point.
+2) iterate over the pointcloud vector and determine for each point using it's x and y coordinates in which gridcell it falls (this is a simple one line formula). Then either put the point in that gridcell if it is empty or overwrite the point in the gridcell if the current point is lower (compare using the z coordinate).
+3) Finally with the points that are now in the virtual grid build the initial TIN.
+
+This should be very fast (time complexity O(N)) and no KD tree is needed.
+ */
+
+  std::vector<std::vector<double>> make_bbox(const std::vector<Point>& pointcloud) {
+    auto xExtremes = std::minmax_element(pointcloud.begin(), pointcloud.end(),
+                                         [](const Point& lhs, const Point& rhs) {
+                                             return lhs.x() < rhs.x();
+                                         });
+
+    auto yExtremes = std::minmax_element(pointcloud.begin(), pointcloud.end(),
+                                         [](const Point& lhs, const Point& rhs) {
+                                             return lhs.y() < rhs.y();
+                                         });
+
+    std::vector<std::vector<double>> bbox;
+    std::vector<double> upperLeft = {xExtremes.first->x(), yExtremes.first->y()};
+    std::vector<double> lowerRight = {xExtremes.second->x(), yExtremes.second->y()};
+    bbox = {upperLeft, lowerRight};
+
+    return bbox;
+}
+
+std::vector<int> make_cells(const std::vector<std::vector<double>>& bbox, const double& resolution) {
+    int CELLROWS = std::ceil((bbox[1][1] - bbox[0][1]) / resolution);
+    int CELLCOLS = std::ceil((bbox[1][0] - bbox[0][0]) / resolution);
+    std::vector<int> CELLROWSCOLS = {CELLROWS, CELLCOLS};
+    return CELLROWSCOLS;
+}
 
 
 void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams) {
@@ -43,19 +84,94 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   typedef CGAL::Projection_traits_xy_3<Kernel>  Gt;
   typedef CGAL::Delaunay_triangulation_2<Gt> DT;
 
+  for (auto p: pointcloud) {if (p.x() == 0. || p.y() == 0. || p.z() == 0.) {std::cout << "outlier detected: " << p << std::endl;}}
+
   double resolution = jparams["resolution"];
   double distance = jparams["distance"];
   double angle = jparams["angle"];
   std::string output_las = jparams["output_las"];
 
+  std::cout << "output_las: " << output_las << std::endl;
+  std::cout << "resolution: " << resolution << std::endl;
+  std::cout << "distance: " << distance << std::endl;
+  std::cout << "angle: " << angle << std::endl;
+
+  // Initialize bbox and number of cells blocks corresponding to resolution
+  const std::vector<std::vector<double>> bbox = make_bbox(pointcloud);
+  //std::cout << "the bbox: " << "upperLeft: (" << bbox[0][0] << ", " << bbox[0][1] << ")" << " lowerRight: (" << bbox[1][0] << ", " << bbox[1][1] << ")" << std::endl;
+  const std::vector<int> CELLROWSCOLS = make_cells(bbox, resolution);
+  std::cout << "the number of CELLROWS: " << CELLROWSCOLS[0] << ", CELLCOLS: " << CELLROWSCOLS[1] << std::endl;
+  const int CELLROWS = CELLROWSCOLS[0];
+  const int CELLCOLS = CELLROWSCOLS[1];
+  //const int rows = std::ceil(bbox[1][1] - bbox[0][1]);
+  //const int cols = std::ceil(bbox[1][0] - bbox[0][0]);
+
+  const double offsetX = bbox[0][0];
+  const double offsetY = bbox[0][1];
+
+  //std::cout << "rows, cols: " << rows << ", " << cols << std::endl;
+  std::cout << "offset x, y: " << offsetX << ", " << offsetY << std::endl;
+
+  // Initialize virtual grid to store initial ground points
+  std::vector<std::vector<Point>> vGrid(CELLROWS,std::vector<Point>(CELLCOLS));
+
+  // The virtual grid will have one point per cellblock, which will contain lowest elevation value.
+  for (auto p : pointcloud) {
+      int cellX, cellY;
+      cellX = std::round((p.y() - offsetY) / resolution);
+      cellY = std::round((p.x() - offsetX) / resolution);
+      //std::cout << "x, y: " << cellX << ", " << cellY << std::endl;
+      //std::cout << "what's inside this cell: " << vGrid[cellX][cellY] << std::endl;
+
+      // This pointcloud dataset contains noise/outliers that have some or all p(x, y, z) = ~(0., 0., 0.)
+      // the optional filter  && (p[0] != 0. && p[1] != 0. && p[2] != 0.) or  && (p[0] != 0. || p[1] != 0. || p[2] != 0.)
+      if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {vGrid[cellX][cellY] = p;}
+      else {
+          if (p[2] < vGrid[cellX][cellY][2]) {vGrid[cellX][cellY] = p;}
+      }
+
+  }
+
   //-- TIP CGAL triangulation -> https://doc.cgal.org/latest/Triangulation_2/index.html
   //-- Insert points in a triangulation: [https://doc.cgal.org/latest/Triangulation_2/classCGAL_1_1Triangulation__2.html#a1025cd7e7226ccb44d82f0fb1d63ad4e]
   DT dt;
-  dt.insert(Point(0,0,0));
-  dt.insert(Point(10,0,0));
-  dt.insert(Point(0,10,0));
+
+  // Insertion of initial points from vGrid into DT
+  for (int i=0; i < CELLROWS; i++) {
+      for (int j=0; j < CELLCOLS; j++) {
+          //std::cout << "vGrid[" << i << "][" << j << "] = " << vGrid[i][j] << std::endl;
+          dt.insert(vGrid[i][j]);
+      }
+  }
+
+
+
+    /*
+    int count = 0;
+    for (size_t row=0; row < rows; row += resolution) {
+        for (size_t col=0; col < cols; col += resolution) {
+            //std::cout << "zeh each row and cols: " << row << ", " << col << std::endl;
+            count++;
+            std::vector<double> localMin;
+            for (size_t i=0; i < resolution; ++i) {
+                for (size_t j=0; j < resolution; ++j) {
+                    //std::cout << "point: " << row + i << ", " << col + j << std::endl;
+                    localMin.push_back(pointcloud[row + i][col + j]);
+                }
+            }
+            std::vector<double>::iterator result = std::min_element(localMin.begin(), localMin.end());
+            //std::cout << "localMin: " << result[0] << std::endl;
+        }
+    }
+    std::cout << "the count: " << count << std::endl;
+    */
+
+  DT dtT;
+  dtT.insert(Point(0,0,4));
+  dtT.insert(Point(10,0,3));
+  dtT.insert(Point(0,10,0));
   //-- Find triangle that intersects a given point: [https://doc.cgal.org/latest/Triangulation_2/classCGAL_1_1Triangulation__2.html#a940567120751e7864c7b345eaf756642]
-  DT::Face_handle triangle = dt.locate(Point(3,3,0));
+  DT::Face_handle triangle = dtT.locate(Point(5,5,1000));
   //-- get the 3 vertices of the triangle: 
   DT::Vertex_handle v0 = triangle->vertex(0);
   DT::Vertex_handle v1 = triangle->vertex(1);
@@ -70,17 +186,12 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   
   //-- TIP
   //-- write the results to a new LAS file
-  std::vector<int> class_labels;
+  //std::vector<int> class_labels;
 
   //write_lasfile(jparams["output_las"], pointcloud, class_labels);
 }
 
-// TODO
-/*
- * write make_bbox function (see hw01 code)
- * write make_cells function
- * loop through all cells, and select lowest elevation point of each cell and add to DT
- */
+
 
 /*
   bbox part_wassenaar_ahn3.laz
@@ -88,9 +199,10 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   max x y z:                  84599.998 460749.999 33.168
 
   expected number of cells with resolution=5
-  x -> 84600 - 84509 = 91 -> 91 / 5 = 18.2 -> 19
-  y -> 460750 - 460679 = 71 -> 71 / 5 = 14.2 -> 15
+  CELLCOLS -> 84600 - 84509 = 91 -> 91 / 5 = 18.2 -> 19
+  CELLSROWS -> 460750 - 460679 = 71 -> 71 / 5 = 14.2 -> 15
  */
+
 
 
 
@@ -110,9 +222,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
       - epsilon_ground: threshold used to classify ground points,
       - output_las:     path to output .las file that contains your ground classification
   */
-  typedef CGAL::Search_traits_3<Kernel> TreeTraits;
-  typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
-  typedef Neighbor_search::Tree Tree;
+
 
   // double resolution = jparams["resolution"];
   // double epsilon_zmax = jparams["epsilon_zmax"];
@@ -245,3 +355,4 @@ void write_lasfile(const std::string filename, const std::vector<Point>& pointcl
   laswriter->close();
   delete laswriter;
 }
+

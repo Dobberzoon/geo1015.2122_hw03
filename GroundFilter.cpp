@@ -22,7 +22,13 @@
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/Search_traits_3.h>
 
-// -- CGAL other
+// -- Other
+#include <CGAL/Vector_3.h> // only used for experimenting
+#include <CGAL/Triangle_3.h>
+//#include <CGAL/squared_distance_3.h> //for 3D functions
+#include <cmath>
+typedef Kernel::Triangle_3 Triangle;
+typedef Kernel::Vector_3 Vector; //only used for experimenting
 typedef CGAL::Search_traits_3<Kernel> TreeTraits;
 typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
 typedef Neighbor_search::Tree Tree;
@@ -84,7 +90,7 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   typedef CGAL::Projection_traits_xy_3<Kernel>  Gt;
   typedef CGAL::Delaunay_triangulation_2<Gt> DT;
 
-  for (auto p: pointcloud) {if (p.x() == 0. || p.y() == 0. || p.z() == 0.) {std::cout << "outlier detected: " << p << std::endl;}}
+  for (Point p: pointcloud) {if (p.x() == 0. || p.y() == 0. || p.z() == 0.) {std::cout << "outlier detected: " << p << std::endl;}}
 
   double resolution = jparams["resolution"];
   double distance = jparams["distance"];
@@ -115,7 +121,16 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   // Initialize virtual grid to store initial ground points
   std::vector<std::vector<Point>> vGrid(CELLROWS,std::vector<Point>(CELLCOLS));
 
+    //‘2’ for ground points
+    //‘1’ for all the other points
+  std::vector<int> class_labels;
+
   // The virtual grid will have one point per cellblock, which will contain lowest elevation value.
+
+  std::vector<Point>::const_iterator itPc;
+
+  int cc=0; int cc2=0; int cc3=0;
+
   for (auto p : pointcloud) {
       int cellX, cellY;
       cellX = std::round((p.y() - offsetY) / resolution);
@@ -125,12 +140,27 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
 
       // This pointcloud dataset contains noise/outliers that have some or all p(x, y, z) = ~(0., 0., 0.)
       // the optional filter  && (p[0] != 0. && p[1] != 0. && p[2] != 0.) or  && (p[0] != 0. || p[1] != 0. || p[2] != 0.)
-      if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {vGrid[cellX][cellY] = p;}
-      else {
-          if (p[2] < vGrid[cellX][cellY][2]) {vGrid[cellX][cellY] = p;}
-      }
+      if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {
+          vGrid[cellX][cellY] = p;
+          class_labels.push_back(2);
 
+      }
+      else if (p[2] < vGrid[cellX][cellY][2]) {
+
+          itPc = std::find(pointcloud.begin(), pointcloud.end(), vGrid[cellX][cellY]);
+
+          int idxPc = std::distance(pointcloud.begin(), itPc);
+
+          class_labels[idxPc] = 1;
+
+          vGrid[cellX][cellY] = p;
+          class_labels.push_back(2);
+      }
+      else {
+          class_labels.push_back(1);
+      }
   }
+
 
   //-- TIP CGAL triangulation -> https://doc.cgal.org/latest/Triangulation_2/index.html
   //-- Insert points in a triangulation: [https://doc.cgal.org/latest/Triangulation_2/classCGAL_1_1Triangulation__2.html#a1025cd7e7226ccb44d82f0fb1d63ad4e]
@@ -139,11 +169,79 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   // Insertion of initial points from vGrid into DT
   for (int i=0; i < CELLROWS; i++) {
       for (int j=0; j < CELLCOLS; j++) {
-          //std::cout << "vGrid[" << i << "][" << j << "] = " << vGrid[i][j] << std::endl;
+          std::cout << "vGrid[" << i << "][" << j << "] = " << vGrid[i][j] << std::endl;
           dt.insert(vGrid[i][j]);
       }
   }
 
+
+    int count = 0;
+
+    for (auto label : class_labels) {
+        //std::cout << label << std::endl;
+        if (label == 2) {
+            count++;
+            //std::cout << label << std::endl;
+        }
+    }
+    std::cout << "the occurrence of label 2:        " << count << std::endl;
+
+
+  // Computation of property distance
+  int countComp = 0;
+  for (auto p : pointcloud) {
+      if (class_labels[countComp] != 2) {
+          DT::Face_handle triangle = dt.locate(p);
+
+          // The 3 vertices of the triangle:
+          DT::Vertex_handle v0 = triangle->vertex(0);
+          DT::Vertex_handle v1 = triangle->vertex(1);
+          DT::Vertex_handle v2 = triangle->vertex(2);
+
+          // Put points in appropriate triangle/plane object
+          Triangle located;
+          located = Triangle(v0->point(), v1->point(), v2->point());
+
+          // Squared distance calculation
+          double dist = std::sqrt(CGAL::squared_distance(p, located));
+          //std::cout << "distance: " << dist << std::endl;
+
+          std::vector<double> betas;
+          double beta1, beta2, beta3, betamax;
+          Point p0;
+          Vector pv0, pv1, pv2, p0v0, p0v1, p0v2;
+          pv0 = Vector(p, v0->point()); pv1 = Vector(p, v1->point()), pv2 = Vector(p, v2->point());
+          p0 = Point(p[0], p[1], p[2] - dist);
+          p0v0 = Vector(p0, v0->point()); p0v1 = Vector(p0, v1->point()), p0v2 = Vector(p0, v2->point());
+
+
+          beta1 = std::acos((pv0 * p0v0) / ((std::sqrt(pv0.squared_length()) * std::sqrt(p0v0.squared_length()))));
+          betas.push_back(beta1);
+          beta2 = std::acos((pv1 * p0v1) / ((std::sqrt(pv1.squared_length()) * std::sqrt(p0v1.squared_length()))));
+          betas.push_back(beta2);
+          beta3 = std::acos((pv2 * p0v2) / ((std::sqrt(pv2.squared_length()) * std::sqrt(p0v2.squared_length()))));
+          betas.push_back(beta3);
+          auto it = std::max_element(betas.begin(), betas.end());
+          betamax = it[0]*180/M_PI;
+
+          if ((dist < distance) && (betamax < angle)) {dt.insert(p); class_labels[countComp] = 2;}
+      }
+      countComp++;
+  }
+  
+
+  DT::Face_handle triangle = dt.locate(Point(5,5,0));
+  //-- get the 3 vertices of the triangle:
+  //DT::Vertex_handle v0 = triangle->vertex(0);
+  //DT::Vertex_handle v1 = triangle->vertex(1);
+  //DT::Vertex_handle v2 = triangle->vertex(2);
+  // get the coordinates of the three vertices:
+  // std::cout << "v0 has the coordinates ( " << v0->point().x() << "  " << v0->point().y() << " " << v0->point().z() << " )" << std::endl;
+  // std::cout << "v1 has the coordinates ( " << v1->point().x() << "  " << v1->point().y() << " " << v1->point().z() << " )" << std::endl;
+  // std::cout << "v2 has the coordinates ( " << v2->point().x() << "  " << v2->point().y() << " " << v2->point().z() << " )" << std::endl;
+
+  //-- TIP CGAL compute squared distance between two points: [https://doc.cgal.org/latest/Kernel_23/group__squared__distance__grp.html#ga1ff73525660a052564d33fbdd61a4f71]
+  //std::cout << "the squared distance between v0 and v1 is: " << CGAL::squared_distance(v0->point(), v1->point()) << std::endl;
 
 
     /*
@@ -171,24 +269,103 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   dtT.insert(Point(10,0,3));
   dtT.insert(Point(0,10,0));
   //-- Find triangle that intersects a given point: [https://doc.cgal.org/latest/Triangulation_2/classCGAL_1_1Triangulation__2.html#a940567120751e7864c7b345eaf756642]
-  DT::Face_handle triangle = dtT.locate(Point(5,5,1000));
-  //-- get the 3 vertices of the triangle: 
-  DT::Vertex_handle v0 = triangle->vertex(0);
-  DT::Vertex_handle v1 = triangle->vertex(1);
-  DT::Vertex_handle v2 = triangle->vertex(2);
-  // get the coordinates of the three vertices:
-  std::cout << "v0 has the coordinates ( " << v0->point().x() << "  " << v0->point().y() << " " << v0->point().z() << " )" << std::endl;
-  std::cout << "v1 has the coordinates ( " << v1->point().x() << "  " << v1->point().y() << " " << v1->point().z() << " )" << std::endl;
-  std::cout << "v2 has the coordinates ( " << v2->point().x() << "  " << v2->point().y() << " " << v2->point().z() << " )" << std::endl;
 
-  //-- TIP CGAL compute squared distance between two points: [https://doc.cgal.org/latest/Kernel_23/group__squared__distance__grp.html#ga1ff73525660a052564d33fbdd61a4f71]
-  std::cout << "the squared distance between v0 and v1 is: " << CGAL::squared_distance(v0->point(), v1->point()) << std::endl;
-  
+  Point p1, p2, p0, p4, p5, p6;
+  p0 = Point(0,0,0);
+  p1 = Point(4, 8, 10);
+  p2 = Point(9, 2, 7);
+  p4 = Point(0.,0.,0.);
+  p5 = Point(1.,1.,1.);
+  p6 = Point(2.,2.,2.);
+
+  Vector a, b;
+  a = Vector(p0, p1);
+  b = Vector(p0, p2);
+
+  std::vector<Point> test;
+  test.push_back(p4);
+  test.push_back(p5);
+  test.push_back(p6);
+
+  std::vector<Point>::iterator itt;
+  itt = std::find(test.begin(), test.end(), p5);
+    if (itt != test.end())
+        std::cout << "Element Found" << std::endl;
+    else
+        std::cout << "Element Not Found" << std::endl;
+
+    int index = std::distance(test.begin(), itt);
+    std::cout << "and test index is: " << index << std::endl;
+
+  //pointcloud.fin
+
+  /*
+  std::vector<Point>::const_iterator it;
+  it = std::find(pointcloud.begin(), pointcloud.end(), p4);
+
+    if (it != test.end())
+        std::cout << "Element Found" << std::endl;
+    else
+        std::cout << "Element Not Found" << std::endl;
+
+    int index = std::distance(test.begin(), it);
+    std::cout << "and its index is: " << index << std::endl;
+
+    int indexT = 4;
+    Point test_idx;
+    test_idx = Point (0.,0.,0.);
+    if (test[4] == Point (0.,0.,0.)) {std::cout << "testing invalid index WORKS " << std::endl;}
+    */
+  /*
+  int count = 0;
+  int countWeird = 0;
+  int countOne = 0;
+
+  for (auto label : class_labels) {
+      //std::cout << label << std::endl;
+      if (label == 2) {
+          count++;
+          //std::cout << label << std::endl;
+      }
+      if (label != 1) {countWeird++; std::cout << label;}
+      if (label == 1) {countOne++;}
+  }
+  std::cout << "the occurrence of label 2:        " << count << std::endl;
+  std::cout << "the occurrence of non-label 1:        " << countWeird << std::endl;
+  std::cout << "the occurrence of label 1:        " << countOne << std::endl;
+  std::cout << "the actual occurrence of label 2: " << 19 * 15 << std::endl;
+  */
+
+  int dot;
+
+  dot = a * b;
+  std::cout << "the inner/dot product of a * b = " << dot << std::endl;
+
+  Point c1, c2, c0, c4;
+  c0 = Point(0,0,0);
+  c1 = Point(2, 3, 4);
+  c2 = Point(5, 6, 7);
+  Vector ca, cb, cross, sub;
+  ca = Vector(c0, c1);
+  cb = Vector(c0, c2);
+  sub = c2 - c1;
+  c4 = Point(sub[0], sub[1], sub[2]);
+  double dot2;
+  dot2 = sub * ca;
+
+  std::cout << "subtraction vector of points c2 - c1 = " << sub << " which is the same as: " << c4 << std::endl;
+  std::cout << "and the dot product of the result * ca = (" << sub << ") * " << ca << " = " << dot2 << std::endl;
+
+  cross = CGAL::cross_product(ca, cb);
+  std::cout << "the cross product of a x b = " << cross << std::endl;
+
+
+
   //-- TIP
   //-- write the results to a new LAS file
-  //std::vector<int> class_labels;
 
-  //write_lasfile(jparams["output_las"], pointcloud, class_labels);
+
+  write_lasfile(jparams["output_las"], pointcloud, class_labels);
 }
 
 

@@ -2,10 +2,9 @@
   GEO1015.2021
   hw03 
   --
-  [YOUR NAME] 
-  [YOUR STUDENT NUMBER] 
-  [YOUR NAME] 
-  [YOUR STUDENT NUMBER] 
+  Author:           Daniël Dobson
+  Student number:   5152739
+
 */
 
 #include "GroundFilter.h"
@@ -22,13 +21,14 @@
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/Search_traits_3.h>
 
-// -- Other
-#include <CGAL/Vector_3.h> // only used for experimenting
+// -- CGAL objects
+#include <CGAL/Vector_3.h>
 #include <CGAL/Triangle_3.h>
-//#include <CGAL/squared_distance_3.h> //for 3D functions
+
+// -- Other
 #include <cmath>
 typedef Kernel::Triangle_3 Triangle;
-typedef Kernel::Vector_3 Vector; //only used for experimenting
+typedef Kernel::Vector_3 Vector;
 typedef CGAL::Search_traits_3<Kernel> TreeTraits;
 typedef CGAL::Orthogonal_k_neighbor_search<TreeTraits> Neighbor_search;
 typedef Neighbor_search::Tree Tree;
@@ -114,8 +114,6 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
       //std::cout << "x, y: " << cellX << ", " << cellY << std::endl;
       //std::cout << "what's inside this cell: " << vGrid[cellX][cellY] << std::endl;
 
-      // This pointcloud dataset contains noise/outliers that have some or all p(x, y, z) = ~(0., 0., 0.)
-      // the optional filter  && (p[0] != 0. && p[1] != 0. && p[2] != 0.) or  && (p[0] != 0. || p[1] != 0. || p[2] != 0.)
       if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {
           vGrid[cellX][cellY] = p;
           class_labels.push_back(2);
@@ -189,8 +187,7 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   }
 
   // Write results to new LAS file
-
-  write_lasfile(jparams["output_las"], pointcloud, class_labels);
+  //write_lasfile(jparams["output_las"], pointcloud, class_labels);
 }
 
 void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams) {
@@ -210,39 +207,184 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
       - output_las:     path to output .las file that contains your ground classification
   */
 
+  double resolution = jparams["resolution"];
+  double epsilon_zmax = jparams["epsilon_zmax"];
+  double epsilon_ground = jparams["epsilon_ground"];
+  std::string output_las = jparams["output_las"];
 
-  // double resolution = jparams["resolution"];
-  // double epsilon_zmax = jparams["epsilon_zmax"];
-  // double epsilon_ground = jparams["epsilon_ground"];
-  // std::string output_las = jparams["output_las"];
+  //-- print the first 5 points in the pointcloud, which are CGAL Point_3
+  //-- https://doc.cgal.org/latest/Kernel_23/classCGAL_1_1Point__3.html
 
-  // //-- print the first 5 points in the pointcloud, which are CGAL Point_3
-  // //-- https://doc.cgal.org/latest/Kernel_23/classCGAL_1_1Point__3.html
-  // int i = 0;
-  // for (auto p : pointcloud) {
-  //   std::cout << "(" << p.x() << ", " << p.y() << ", " << p.z()  << ")" << std::endl;
-  //   i++;
-  //   if (i == 5)
-  //     break;
-  // }
+  // Create S inverse 3D and S inverse 2D (for later use in kd-tree query)
+  std::vector<Point> Sinverse3D;
+  std::vector<Point> Sinverse2D;
+  for (auto p : pointcloud) {
+      Point pInv3D = Point(p.x(), p.y(), p.z() * - 1);
+      Point pInv2D = Point(p.x(), p.y(), 0.);
+      Sinverse3D.push_back(pInv3D);
+      Sinverse2D.push_back(pInv2D);
+  }
 
-  //-- TIP
-  //-- construct and query kd-tree:
+  //std::cout << "size pointcloud:        " << pointcloud.size() << std::endl;
+  //std::cout << "size Sinverse3D: " << Sinverse3D.size() << std::endl;
+
+  // Initialise the cloth C at an elevation z0 higher than the highest elevation
+  double maxZ;
+  double z0 = 10.;
+  for (auto p : Sinverse3D) {if (p.z() > maxZ) maxZ = p.z();}
+  //std::cout << "maxZ: " << maxZ << std::endl;
+
+  // Initialize bbox and number of cells blocks corresponding to resolution
+  const std::vector<std::vector<double>> bbox = make_bbox(pointcloud);
+  const std::vector<int> CELLROWSCOLS = make_cells(bbox, resolution);
+  const int CELLROWS = CELLROWSCOLS[0];
+  const int CELLCOLS = CELLROWSCOLS[1];
+  std::cout << "CELLROWS: " << CELLROWS << "\n";
+  std::cout << "CELLCOLS: " << CELLCOLS << "\n";
+
+  const double offsetX = bbox[0][0];
+  const double offsetY = bbox[0][1];
+
+  // Initialize cloth as regularly distributed grid of particles
+  std::vector<std::vector<Point>> cloth(CELLROWS,std::vector<Point>(CELLCOLS));
+
+  std::cout << "cloth size: " << cloth.size() << std::endl;
+
+  // Assign cloth points appropriate Point values
+  for (int i=0; i < CELLROWS; i++) {
+      for (int j=0; j < CELLCOLS; j++) {
+          double cellX, cellY, cellZ;
+          cellX = offsetX + (i * resolution);
+          cellY = offsetY + (j * resolution);
+          cellZ = z0;
+          cloth[i][j] = Point(cellX, cellY, cellZ);
+      }
+  }
+
+  // Calculate particle elevation parameters
+  std::vector<std::vector<std::vector<double>>> zParams(CELLROWS,std::vector<std::vector<double>>(CELLCOLS));
+  //std::vector<std::vector<double>> zParams; // Initialise vector to store z params
+
+  // Construct and query kd-tree:
   // https://doc.cgal.org/latest/Spatial_searching/index.html#title5
-  //
-  // Tree tree(pointcloud.begin(), pointcloud.end());
-  // const unsigned int N = 1;
-  // Point query_point = Point(0,0,0);
-  // Neighbor_search search_result(tree, query_point, N);
-  //
-  // for(auto res : search_result) {
-  //   Point neighbour_point = res.first;
-  //   double distance = res.second;
-  // }
+  Tree tree(Sinverse2D.begin(), Sinverse2D.end());
+  const unsigned int N = 1;
+  std::vector<Point>::iterator itS2D;
+  std::vector<double> displacement = {0., 0., -4.};
+  double disp = 4.;
+  int actual_cloth_size = 0;
+  for (int i=0; i < CELLROWS; i++) {
+      for (int j=0; j < CELLCOLS; j++) {
+          actual_cloth_size++;
+          double pZmin, pZprev, pZcur;
+          std::vector<double> zParam;
+          //zParam[0] = pZmin; zParam[1] = pZprev; zParam[2] = pZcur;
+
+          //std::cout << "i, j:               " << i << ", " << j << std::endl;
+          //std::cout << "cloth[i][j]:        " << cloth[i][j] << std::endl;
+          Point query_point = Point(cloth[i][j].x(), cloth[i][j].y(), 0.);
+          Neighbor_search search_result(tree, query_point, N);
+          for (auto res: search_result) {
+              Point neighbour_point = res.first;
+              double distance = res.second;
+              double distanceSquare = std::sqrt(res.second);
+              //std::cout << "query_point:        " << query_point << std::endl;
+              //std::cout << "neighbour_point:    " << neighbour_point << std::endl;
+              //std::cout << "neighbour_point z:    " << neighbour_point.z() << std::endl;
+
+              itS2D = std::find(Sinverse2D.begin(), Sinverse2D.end(), neighbour_point);
+              int idxS3D = std::distance(Sinverse2D.begin(), itS2D);
+              pZmin = Sinverse3D[idxS3D].z();
+              zParams[i][j].push_back(pZmin);
+              pZcur = z0;
+              pZprev = z0 + disp;
+              zParams[i][j].push_back(pZprev);
+              zParams[i][j].push_back(pZcur);
+              zParams[i][j].push_back(1.); // Insert movable variable
+              //std::cout << "Sinverse p:         " << Sinverse3D[idxS3D] << std::endl;
+              //pZmin = neighbour_point.z(); zParam.push_back(pZmin);
+              //std::cout << "distance:           " << distance << std::endl;
+              //std::cout << "distanceSquare:     " << distanceSquare << std::endl;
+          }
+      }
+  }
+    int cone=0; int ctwo=0; int cthree=0; int cfour=0; int cfive=0; int csix=0; int cseven=0; int ceight=0; int cnine=0;
+  //int movable = 0;
+  double deltaZ = 0.2;
+  while (deltaZ > epsilon_zmax) {
+
+      // external forces, apply to all movable p
+      for (int i = 0; i < CELLROWS; i++) {
+          for (int j = 0; j < CELLCOLS; j++) {
+              if (zParams[i][j][3] == 1.) {
+                  //std::cout << "[i][j]:         [" << i << "][" << j << "]" << std::endl;
+                  //std::cout << "zParams[i][j]:    (" << zParams[i][j][0] << ", " << zParams[i][j][1] << ", "
+                  //          << zParams[i][j][2] << ")" << std::endl;
+                  //std::cout << "after one iteration, the result of step 10-13 is:" << std::endl;
+                  double pzmin = zParams[i][j][0];
+                  double pzprev = zParams[i][j][1];
+                  double pzcur = zParams[i][j][2];
+
+                  double tmp = pzcur;
+                  pzcur = (pzcur - pzprev) + pzcur;
+                  pzprev = tmp;
+                  if (pzcur <= pzmin) {pzcur = pzmin; zParams[i][j][0] = 0.;}
+                  zParams[i][j][1] = pzprev;
+                  zParams[i][j][2] = pzcur;
+                  //std::cout << "pzcur:      " << pzcur << std::endl;
+                  //std::cout << "pzprev:     " << pzprev << std::endl;
+                  //if (zParams[i][j][3] == 0.) { std::cout << "Indeed, this one is movable...\n"; movable++;}
+              }
+          }
+      }
+
+      // internal forces, process once each set neighbours e of p
+
+      for (int i = 0; i < CELLROWS; i++) {
+          for (int j = 0; j < CELLCOLS; j++) {
+              std::cout << "[i][j]:         [" << i << "][" << j << "]" << std::endl;
+              if ((i > 0) && (i < (CELLROWS - 1)) && (j > 0) && (j < (CELLCOLS - 1))) {cfive++;} // 5
+              else if ((i == 0) && (j > 0) && (j < (CELLCOLS - 1))) {ctwo++;}
+              else if ((i > 0) && (i < (CELLROWS - 1)) && (j == 0)) {cfour++;}
+              else if ((i > 0) && (i < (CELLROWS - 1)) && (j == (CELLCOLS - 1))) {csix++;}
+              else if ((i == (CELLROWS - 1)) && (j > 0) && (j < (CELLCOLS - 1))) {ceight++;}
+              else if ((i == 0) && (j == 0)) {cone++;}
+              else if ((i == 0) && (j == (CELLCOLS - 1))) {cthree++;}
+              else if ((i == (CELLROWS - 1)) && (j == 0)) {cseven++;}
+              else if ((i == (CELLROWS - 1)) && (j == (CELLCOLS - 1))) {cnine++;}
+          }
+      }
+      deltaZ -= 0.1;
+  }
+
+  std::cout << "all the counts: \n one: " << cone << "\n two: " << ctwo << "\n three: " << cthree << "\n four: " << cfour << "\n five: ";
+  std::cout << cfive << "\n six: " << csix << "\n seven: " << cseven << "\n eight: " << ceight << "\n nine: " << cnine << "\n";
+
+
+
+
+  std::cout << "actual cloth size: " << actual_cloth_size << std::endl;
+  //std::cout << "movables: " << movable << std::endl;
+
+  double pZmin, pZprev, pZcur;
+  std::vector<double> zParam;
+  pZmin = 0., pZprev = 1., pZcur = 2.;
+  zParam.push_back(pZmin); zParam.push_back(pZprev); zParam.push_back(pZcur);
+
+  std::cout << "zParam vector:      " << zParam[0] << " " << zParam[1] << " " << zParam[2] << " " << std::endl;
+  std::vector<double> difference;
+  std::transform(zParam.begin(), zParam.end(),
+                               displacement.begin(), zParam.begin(),
+                               std::plus<double>());
+
+    std::cout << "zParam contains:";
+    for (std::vector<double>::iterator it=zParam.begin(); it!=zParam.end(); ++it)
+        std::cout << ' ' << *it;
+    std::cout << '\n';
 
   //-- TIP
   //-- write the results to a new LAS file
-  // std::vector<int> class_labels;
+  std::vector<int> class_labels;
   // write_lasfile(jparams["output_las"], pointcloud, class_labels);
 }
 

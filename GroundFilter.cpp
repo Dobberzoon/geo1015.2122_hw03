@@ -215,6 +215,10 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
 
   // Write results to new LAS file
   write_lasfile(jparams["output_las"], pointcloud, class_labels);
+
+  if (groundPoints == 0) {
+      std::cout << "ERROR: No ground points detected.\n Run again, and/or change parameters.\n";
+  }
 }
 
 void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams) {
@@ -234,6 +238,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   double epsilon_zmax = jparams["epsilon_zmax"];
   double epsilon_ground = jparams["epsilon_ground"];
   std::string output_las = jparams["output_las"];
+  double displacement = 0.5;
 
   // Create S inverted 3D and S 2D (for later use in kd-tree query).
   std::vector<Point> S3Dinverted;
@@ -247,8 +252,8 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
   // Initialise the cloth C at an elevation z0 higher than the highest elevation
   double maxZ;
-  double z0 = 4.;
   for (auto p : S3Dinverted) {if (p.z() > maxZ) maxZ = p.z();}
+  double z0 = maxZ + (4 * displacement);
 
   // Initialize bbox and number of cells blocks for grid (cloth) corresponding to resolution
   const std::vector<std::vector<double>> bbox = make_bbox(pointcloud);
@@ -282,7 +287,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   Tree tree(S2D.begin(), S2D.end());
   const unsigned int N = 1;
   std::vector<Point>::iterator itS2D;
-  double displacement = 0.5;
+
   int actual_cloth_size = 0;
   for (int i=0; i < CELLROWS; i++) {
       for (int j=0; j < CELLCOLS; j++) {
@@ -332,12 +337,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
           for (int j = 0; j < CELLCOLS; j++) {
               if (zParams[i][j][3] == 1.) {
                   if ((i > 0) && (i < (CELLROWS - 1)) && (j > 0) && (j < (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2, n3, n4;
-                      n1 = zParams[i-1][j]; ni.push_back(n1);
-                      n2 = zParams[i+1][j]; ni.push_back(n2);
-                      n3 = zParams[i][j-1]; ni.push_back(n3);
-                      n4 = zParams[i][j+1]; ni.push_back(n4);
+
                       // n1
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
@@ -417,11 +417,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 5
                   else if ((i == 0) && (j > 0) && (j < (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2, n3;
-                      n1 = zParams[i][j-1]; ni.push_back(n1);
-                      n2 = zParams[i][j+1]; ni.push_back(n2);
-                      n3 = zParams[i+1][j]; ni.push_back(n3);
+
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
@@ -482,11 +478,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 2
                   else if ((i > 0) && (i < (CELLROWS - 1)) && (j == 0)) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2, n3;
-                      n1 = zParams[i][j+1]; ni.push_back(n1);
-                      n2 = zParams[i-1][j]; ni.push_back(n2);
-                      n3 = zParams[i+1][j]; ni.push_back(n3);
+
                       // n1
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
@@ -547,11 +539,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 4
                   else if ((i > 0) && (i < (CELLROWS - 1)) && (j == (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2, n3;
-                      n1 = zParams[i][j-1]; ni.push_back(n1);
-                      n2 = zParams[i-1][j]; ni.push_back(n2);
-                      n3 = zParams[i+1][j]; ni.push_back(n3);
+
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
@@ -612,11 +600,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 6
                   else if ((i == (CELLROWS - 1)) && (j > 0) && (j < (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2, n3;
-                      n1 = zParams[i][j-1]; ni.push_back(n1);
-                      n2 = zParams[i][j+1]; ni.push_back(n2);
-                      n3 = zParams[i-1][j]; ni.push_back(n3);
+
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
@@ -676,10 +660,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       }
                   } // 8
                   else if ((i == 0) && (j == 0)) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2;
-                      n1 = zParams[i][j+1]; ni.push_back(n1);
-                      n2 = zParams[i+1][j]; ni.push_back(n2);
+
                       // n1
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
@@ -721,10 +702,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 1
                   else if ((i == 0) && (j == (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2;
-                      n1 = zParams[i][j-1]; ni.push_back(n1);
-                      n2 = zParams[i+1][j]; ni.push_back(n2);
+
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
@@ -766,10 +744,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 3
                   else if ((i == (CELLROWS - 1)) && (j == 0)) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2;
-                      n1 = zParams[i-1][j]; ni.push_back(n1);
-                      n2 = zParams[i][j+1]; ni.push_back(n2);
+
                       // n1
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
@@ -811,10 +786,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
                   } // 7
                   else if ((i == (CELLROWS - 1)) && (j == (CELLCOLS - 1))) {
-                      std::vector<std::vector<double>> ni;
-                      std::vector<double> n1, n2;
-                      n1 = zParams[i][j-1]; ni.push_back(n1);
-                      n2 = zParams[i-1][j]; ni.push_back(n2);
+
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
@@ -901,6 +873,10 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
 
   // Write the results to a new LAS file
   write_lasfile(jparams["output_las"], pointcloud, class_labels);
+
+  if (groundPoints == 0) {
+      std::cout << "WARNING: No ground points detected.\n Run again, and/or change parameters.\n";
+  }
 }
 
 

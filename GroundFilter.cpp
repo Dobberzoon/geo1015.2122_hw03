@@ -857,8 +857,8 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
       Neighbor_search search_result(tree3d, query_point, N);
       for (auto res : search_result) {
           Point neighbour_point = res.first;
-          double distance = res.second;
-          if (distance < (epsilon_ground*epsilon_ground)) {class_labels.push_back(2);}
+          double distance = std::sqrt(res.second);
+          if (distance < epsilon_ground) {class_labels.push_back(2);}
           else {class_labels.push_back(1);}
       }
   }

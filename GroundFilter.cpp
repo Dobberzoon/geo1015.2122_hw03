@@ -117,7 +117,7 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   // ‘1’ for all the other points
   std::vector<int> class_labels;
 
-  // For the construction of the rudimentary initial Delaunay TIN, locally the lowest elevation points are needed.
+  // For the construction of the rudimentary initial Delaunay TIN, the locally lowest elevation points are needed.
   // To achieve this, we loop over all points p in pointcloud, determine in which cellblock it would fall,
   // and only save the lowest local z-value for each cellblock.
 
@@ -155,14 +155,17 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   // Initialise the Delaunay Triangulation (DT) object
   DT dt;
 
-  // Insertion of initial points from vGrid into DT
+  // Insertion of initial ground points from vGrid into DT
   for (int i=0; i < CELLROWS; i++) {
       for (int j=0; j < CELLCOLS; j++) {
           dt.insert(vGrid[i][j]);
       }
   }
 
-  // Computation of property distance
+  // Computation of geometric properties for all points p in pointcloud:
+  // 1. distance:   Orthogonal point-plane distance of point p and corresponding triangle t from Dt.
+  // 2. alpha:      largest angle of angles between point p and the vectors that connect it to corresponding triangle t
+  // vertices.
   int countComp = 0;
   for (auto p : pointcloud) {
       if (class_labels[countComp] != 2) {
@@ -182,7 +185,7 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
 
           // Max angle calculation
           std::vector<double> betas;
-          double beta1, beta2, beta3, betamax;
+          double beta1, beta2, beta3, alphamax;
           Point p0;
           Vector pv0, pv1, pv2, p0v0, p0v1, p0v2;
           pv0 = Vector(p, v0->point()); pv1 = Vector(p, v1->point()), pv2 = Vector(p, v2->point());
@@ -195,9 +198,9 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
           beta3 = std::acos((pv2 * p0v2) / ((std::sqrt(pv2.squared_length()) * std::sqrt(p0v2.squared_length()))));
           betas.push_back(beta3);
           auto it = std::max_element(betas.begin(), betas.end());
-          betamax = it[0]*180/M_PI;
+          alphamax = it[0]*180/M_PI;
 
-          if ((dist < distance) && (betamax < angle)) {dt.insert(p); class_labels[countComp] = 2;}
+          if ((dist < distance) && (alphamax < angle)) {dt.insert(p); class_labels[countComp] = 2;}
       }
       countComp++;
   }

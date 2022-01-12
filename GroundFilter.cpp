@@ -36,12 +36,12 @@ typedef Neighbor_search::Tree Tree;
 
 std::vector<std::vector<double>> make_bbox(const std::vector<Point>& pointcloud) {
     /*
-        Function that takes a vector of points and extracts its bounding box.
+    Function that takes a vector of points and extracts its bounding box.
 
-        Input:
-            pointcloud:     input point cloud (an Nx3 numpy array)
-        Output:
-            vector of vectors containing upperleft {x_min, y_min} and lowerright {x_max, y_max} corner.
+    Input:
+        pointcloud:     input point cloud (an Nx3 numpy array)
+    Output:
+        vector of vectors containing upperleft {x_min, y_min} and lowerright {x_max, y_max} corner.
      */
     auto xExtremes = std::minmax_element(pointcloud.begin(), pointcloud.end(),
                                          [](const Point& lhs, const Point& rhs) {
@@ -62,27 +62,27 @@ std::vector<std::vector<double>> make_bbox(const std::vector<Point>& pointcloud)
 }
 
 std::vector<int> make_cells(const std::vector<std::vector<double>>& bbox, const double& resolution) {
+    /*
+    Function that takes a bounding box and desired resolution, to return the number of rows and cells for
+    construction of a grid.
+
+    Input:
+        bbox:       vector containing all extremes of data's extent.
+        resolution: of type double
+    Output:
+        vector of integers {rows, cols}
+    */
     int CELLROWS = std::ceil((bbox[1][1] - bbox[0][1]) / resolution);
     int CELLCOLS = std::ceil((bbox[1][0] - bbox[0][0]) / resolution);
     std::vector<int> CELLROWSCOLS = {CELLROWS, CELLCOLS};
     return CELLROWSCOLS;
 }
 
-void displace_pt(std::vector<double>& clothPt, std::vector<double> displacement) {
-    std::transform(clothPt.begin(), clothPt.end(),
-                   displacement.begin(), clothPt.begin(),
-                   std::minus<double>());
-}
-
 
 void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams) {
   /*
-    !!! TO BE COMPLETED !!!
-      
     Function that performs ground filtering using TIN refinement and writes the result to a new LAS file.
 
-    !!! You are free to subdivide the functionality of this function into several functions !!!
-      
     Inputs:
       pointcloud: input point cloud (an Nx3 numpy array),
       jparams: a dictionary jparams with all the parameters that are to be used in this function:
@@ -105,50 +105,47 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   const int CELLROWS = CELLROWSCOLS[0];
   const int CELLCOLS = CELLROWSCOLS[1];
 
+  // The offset is needed for determining the correct spacing of the grid cells
   const double offsetX = bbox[0][0];
   const double offsetY = bbox[0][1];
-
-  std::cout << "minX:     " << offsetX << "\n";
-  std::cout << "minY:     " << offsetY << "\n";
-  std::cout << "maxX:     " << bbox[1][0] << "\n";
-  std::cout << "maxY:     " << bbox[1][1] << "\n";
 
   // Initialize virtual grid to store initial ground points
   std::vector<std::vector<Point>> vGrid(CELLROWS,std::vector<Point>(CELLCOLS));
 
-
   // Initialise vector to store class labels, codes used:
   // ‘2’ for ground points
   // ‘1’ for all the other points
-
   std::vector<int> class_labels;
 
-  // The virtual grid will have one point per cellblock, which will contain lowest elevation value.
+  // For the construction of the rudimentary initial Delaunay TIN, locally the lowest elevation points are needed.
+  // To achieve this, we loop over all points p in pointcloud, determine in which cellblock it would fall,
+  // and only save the lowest local z-value for each cellblock.
 
   std::vector<Point>::const_iterator itPc; // variable needed for finding index
   for (auto p : pointcloud) {
+
+      // Determination to which cellblock point p belongs
       int cellX, cellY;
       cellX = std::round((p.y() - offsetY) / resolution);
       cellY = std::round((p.x() - offsetX) / resolution);
-      //std::cout << "x, y: " << cellX << ", " << cellY << std::endl;
-      //std::cout << "what's inside this cell: " << vGrid[cellX][cellY] << std::endl;
 
+      // If grid cell is empty, we assign point p to it and the corresponding point p is marked as ground point.
       if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {
           vGrid[cellX][cellY] = p;
           class_labels.push_back(2);
-
       }
+
+      // If p has a lower elevation than previous lowest local elevation, grid cell is overwritten with p.
+      // The previous point's class is reverted to non-ground point, and current point is marked as ground point.
       else if (p[2] < vGrid[cellX][cellY][2]) {
-
           itPc = std::find(pointcloud.begin(), pointcloud.end(), vGrid[cellX][cellY]);
-
           int idxPc = std::distance(pointcloud.begin(), itPc);
-
           class_labels[idxPc] = 1;
-
           vGrid[cellX][cellY] = p;
           class_labels.push_back(2);
       }
+
+      // If neither, the point is skipped and marked as non-ground point.
       else {
           class_labels.push_back(1);
       }

@@ -35,6 +35,14 @@ typedef Neighbor_search::Tree Tree;
 
 
 std::vector<std::vector<double>> make_bbox(const std::vector<Point>& pointcloud) {
+    /*
+        Function that takes a vector of points and extracts its bounding box.
+
+        Input:
+            pointcloud:     input point cloud (an Nx3 numpy array)
+        Output:
+            vector of vectors containing upperleft {x_min, y_min} and lowerright {x_max, y_max} corner.
+     */
     auto xExtremes = std::minmax_element(pointcloud.begin(), pointcloud.end(),
                                          [](const Point& lhs, const Point& rhs) {
                                              return lhs.x() < rhs.x();
@@ -905,9 +913,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
           }
       }
 
-      if (deltaZstopper >= 500){
-          std::cout << "STOP!" << "\n";
-          break;}
+      if (deltaZstopper >= 500){break;}
 
   }
 
@@ -915,91 +921,23 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
     for (int i=0; i < CELLROWS; i++) {
         for (int j=0; j < CELLCOLS; j++) {
             clothVec.push_back(cloth[i][j]);
-            // if (i == 0) {std::cout << "cloth[0][j]:     " << cloth[i][j] << "\n";}
-            // if (j == 0) {std::cout << "cloth[i][0]:     " << cloth[i][j] << "\n";}
-
-        }
-    }
-
-    for (int i=0; i < CELLROWS; i++) {
-        for (int j=0; j < CELLCOLS; j++) {
-
-            // if (i == (CELLROWS - 1)) {std::cout << "cloth[max][j]:      " << cloth[i][j] << "\n";}
-            // if (j == (CELLCOLS - 1)) {std::cout << "cloth[i][max]:      " << cloth[i][j] << "\n";}
         }
     }
 
   std::vector<int> class_labels;
   Tree tree3d(clothVec.begin(), clothVec.end());
-  int idx=0;
   for (auto p : S3Dinverted) {
       Point query_point = p;
       Neighbor_search search_result(tree3d, query_point, N);
       for (auto res : search_result) {
           Point neighbour_point = res.first;
           double distance = res.second;
-          if (distance < (epsilon_ground*epsilon_ground)) {class_labels.push_back(2);
-              //std::cout << "groundpoint found...\n";
-          }
+          if (distance < (epsilon_ground*epsilon_ground)) {class_labels.push_back(2);}
           else {class_labels.push_back(1);}
       }
-      idx++;
   }
 
-/*
-    std::vector<Point>::iterator itS3D;
-    for (int i=0; i < CELLROWS; i++) {
-        for (int j=0; j < CELLCOLS; j++) {
-            Point query_point = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z());
-            Neighbor_search search_result(tree3d, query_point, N);
-            for (auto res: search_result) {
-                Point neighbour_point = res.first;
-                double distance = std::sqrt(res.second);
-                if (distance < epsilon_ground) {
-
-                    itS3D = std::find(S3Dinverted.begin(), S3Dinverted.end(), neighbour_point);
-                    int idxS3D = std::distance(S3Dinverted.begin(), itS3D);
-
-                }
-            }
-        }
-    }
-    */
-  std::cout << "all the counts: \n one: " << cone << "\n two: " << ctwo << "\n three: " << cthree << "\n four: " << cfour << "\n five: ";
-  std::cout << cfive << "\n six: " << csix << "\n seven: " << cseven << "\n eight: " << ceight << "\n nine: " << cnine << "\n";
-
-
-
-
-  std::cout << "actual cloth size: " << actual_cloth_size << std::endl;
-  //std::cout << "movables: " << movable << std::endl;
-
-  double pZmin, pZprev, pZcur;
-  std::vector<double> zParam;
-  pZmin = 0., pZprev = 1., pZcur = 2.;
-  zParam.push_back(pZmin); zParam.push_back(pZprev); zParam.push_back(pZcur);
-
-  std::cout << "zParam vector:      " << zParam[0] << " " << zParam[1] << " " << zParam[2] << " " << std::endl;
-  std::vector<double> difference;
-  //std::transform(zParam.begin(), zParam.end(),
-  //                             displacement.begin(), zParam.begin(),
-  //                             std::minus<double>());
-
-    std::cout << "zParam contains:";
-    for (std::vector<double>::iterator it=zParam.begin(); it!=zParam.end(); ++it)
-        std::cout << ' ' << *it;
-    std::cout << '\n';
-
-  //  displace_pt(cloth[0][0], displacement);
-
-    std::cout << "cloth[0][0] contains:";
-    for (std::vector<double>::iterator it=zParam.begin(); it!=zParam.end(); ++it)
-        std::cout << ' ' << *it;
-    std::cout << '\n';
-
-  //-- TIP
-  //-- write the results to a new LAS file
-
+  // Write the results to a new LAS file
   write_lasfile(jparams["output_las"], pointcloud, class_labels);
 }
 

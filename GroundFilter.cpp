@@ -128,20 +128,9 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   const double offsetX = bbox[0][0];
   const double offsetY = bbox[0][1];
 
-  //std::vector<std::vector<Point>> vGrid(CELLROWS, std::vector<Point>(CELLCOLS));
 
-
-    /*
-    for (int i = 0; i < CELLROWS; i++) {
-        for (int j = 0; j < CELLCOLS; j++) {
-            std::cout << "vGrid[i][j]:      " << vGrid[i][j] << "\n";
-
-        }
-    }
-    */
-
-  int stabilityCount = 0;
-  while (stabilityCount < 1) {
+  int stabilityCount = 0; //
+  while (stabilityCount < 1) { // this is an optional method for stability testing. Increase number larger than 1 to run more than once.
       // Initialize virtual grid to store initial ground points
       std::vector<std::vector<Point>> vGrid(CELLROWS, std::vector<Point>(CELLCOLS));
 
@@ -166,8 +155,8 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
 
           // Determination to which cellblock point p belongs
           int cellX, cellY;
-          cellX = std::round((p.y() - offsetY) / resolution);
-          cellY = std::round((p.x() - offsetX) / resolution);
+          cellX = std::floor((p.y() - offsetY) / resolution);
+          cellY = std::floor((p.x() - offsetX) / resolution);
 
 
           // If grid cell is empty, we assign point p to it and the corresponding point p is marked as ground point.
@@ -199,6 +188,7 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
           else {
               class_labels.push_back(1);
           }
+
       }
 
 
@@ -281,6 +271,8 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
       if (groundPoints == 0) {
           std::cout << "ERROR: No ground points detected.\n Run again, and/or change parameters.\n";
       }
+
+
       stabilityCount++;
   }
 
@@ -353,10 +345,9 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   const unsigned int N = 1;
   std::vector<Point>::iterator itS2D;
 
-  int actual_cloth_size = 0;
   for (int i=0; i < CELLROWS; i++) {
       for (int j=0; j < CELLCOLS; j++) {
-          actual_cloth_size++;
+
           double pZmin, pZprev, pZcur;
           std::vector<double> zParam;
           Point query_point = Point(cloth[i][j].x(), cloth[i][j].y(), 0.);
@@ -937,7 +928,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   std::cout << "Original size pointcloud:                   " << pointcloud.size() << "\n";
 
   // Write the results to a new LAS file
-  write_lasfile(jparams["output_las"], pointcloud, class_labels);
+  //write_lasfile(jparams["output_las"], pointcloud, class_labels);
 
   if (groundPoints == 0) {
       std::cout << "WARNING: No ground points detected.\n Run again, and/or change parameters.\n";

@@ -78,6 +78,25 @@ std::vector<int> make_cells(const std::vector<std::vector<double>>& bbox, const 
     return CELLROWSCOLS;
 }
 
+template < typename T>
+std::pair<bool, int > findInVector(const std::vector<T>  & vecOfElements, const T  & element)
+{
+    std::pair<bool, int > result;
+    // Find given element in vector
+    auto it = std::find(vecOfElements.begin(), vecOfElements.end(), element);
+    if (it != vecOfElements.end())
+    {
+        result.second = distance(vecOfElements.begin(), it);
+        result.first = true;
+    }
+    else
+    {
+        result.first = false;
+        result.second = -1;
+    }
+    return result;
+}
+
 
 void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams) {
   /*
@@ -109,116 +128,162 @@ void groundfilter_tin(const std::vector<Point>& pointcloud, const json& jparams)
   const double offsetX = bbox[0][0];
   const double offsetY = bbox[0][1];
 
-  // Initialize virtual grid to store initial ground points
-  std::vector<std::vector<Point>> vGrid(CELLROWS,std::vector<Point>(CELLCOLS));
+  //std::vector<std::vector<Point>> vGrid(CELLROWS, std::vector<Point>(CELLCOLS));
 
-  // Initialise vector to store class labels, codes used:
-  // ‘2’ for ground points
-  // ‘1’ for all the other points
-  std::vector<int> class_labels;
 
-  // For the construction of the rudimentary initial Delaunay TIN, the locally lowest elevation points are needed.
-  // To achieve this, we loop over all points p in pointcloud, determine in which cellblock it would fall,
-  // and only save the lowest local z-value for each cellblock.
+    /*
+    for (int i = 0; i < CELLROWS; i++) {
+        for (int j = 0; j < CELLCOLS; j++) {
+            std::cout << "vGrid[i][j]:      " << vGrid[i][j] << "\n";
 
-  std::vector<Point>::const_iterator itPc; // variable needed for finding index
-  for (auto p : pointcloud) {
+        }
+    }
+    */
 
-      // Determination to which cellblock point p belongs
-      int cellX, cellY;
-      cellX = std::round((p.y() - offsetY) / resolution);
-      cellY = std::round((p.x() - offsetX) / resolution);
+  int stabilityCount = 0;
+  while (stabilityCount < 1) {
+      // Initialize virtual grid to store initial ground points
+      std::vector<std::vector<Point>> vGrid(CELLROWS, std::vector<Point>(CELLCOLS));
 
-      // If grid cell is empty, we assign point p to it and the corresponding point p is marked as ground point.
-      if ((vGrid[cellX][cellY][0] == 0. && vGrid[cellX][cellY][1] == 0. && vGrid[cellX][cellY][2] == 0.)) {
-          vGrid[cellX][cellY] = p;
-          class_labels.push_back(2);
+      for (int i = 0; i < CELLROWS; i++) {
+          for (int j = 0; j < CELLCOLS; j++) {
+              vGrid[i][j] = Point(0.,0.,0.);
+
+          }
       }
 
-      // If p has a lower elevation than previous lowest local elevation, grid cell is overwritten with p.
-      // The previous point's class is reverted to non-ground point, and current point is marked as ground point.
-      else if (p[2] < vGrid[cellX][cellY][2]) {
-          itPc = std::find(pointcloud.begin(), pointcloud.end(), vGrid[cellX][cellY]);
-          int idxPc = std::distance(pointcloud.begin(), itPc);
-          class_labels[idxPc] = 1;
-          vGrid[cellX][cellY] = p;
-          class_labels.push_back(2);
+      // Initialise vector to store class labels, codes used:
+      // ‘2’ for ground points
+      // ‘1’ for all the other points
+      std::vector<int> class_labels;
+
+      // For the construction of the rudimentary initial Delaunay TIN, the locally lowest elevation points are needed.
+      // To achieve this, we loop over all points p in pointcloud, determine in which cellblock it would fall,
+      // and only save the lowest local z-value for each cellblock.
+
+      //std::vector<Point>::const_iterator itPc; // variable needed for finding index
+      for (auto p: pointcloud) {
+
+          // Determination to which cellblock point p belongs
+          int cellX, cellY;
+          cellX = std::round((p.y() - offsetY) / resolution);
+          cellY = std::round((p.x() - offsetX) / resolution);
+
+
+          // If grid cell is empty, we assign point p to it and the corresponding point p is marked as ground point.
+          if ((vGrid[cellX][cellY][0] == 0.) && (vGrid[cellX][cellY][1] == 0.) && (vGrid[cellX][cellY][2] == 0.)){
+              vGrid[cellX][cellY] = p;
+              class_labels.push_back(2);
+          }
+
+              // If p has a lower elevation than previous lowest local elevation, grid cell is overwritten with p.
+              // The previous point's class is reverted to non-ground point, and current point is marked as ground point.
+          else if (p[2] < vGrid[cellX][cellY][2]) {
+              //itPc = std::find(pointcloud.begin(), pointcloud.end(), vGrid[cellX][cellY]);
+              //int idxPc = std::distance(pointcloud.begin(), itPc);
+              std::pair<bool, int> result = findInVector<Point>(pointcloud, vGrid[cellX][cellY]);
+              if (result.first)
+                  //std::cout << "Element Found at index : " << result.second <<std::endl;
+                  int nothing;
+              else {
+                  std::cout << "Element Not Found" << std::endl;
+                  std::cout << "p:          " << p << "\n";
+                  std::cout << "vGrid[cellX][cellY]:    " << vGrid[cellX][cellY] << "\n";
+              }
+              class_labels[result.second] = 1;
+              vGrid[cellX][cellY] = p;
+              class_labels.push_back(2);
+          }
+
+              // If neither, the point is skipped and marked as non-ground point.
+          else {
+              class_labels.push_back(1);
+          }
       }
 
-      // If neither, the point is skipped and marked as non-ground point.
-      else {
-          class_labels.push_back(1);
+
+      // Initialise the Delaunay Triangulation (DT) object
+      DT dt;
+
+      // Insertion of initial ground points from vGrid into DT
+      for (int i = 0; i < CELLROWS; i++) {
+          for (int j = 0; j < CELLCOLS; j++) {
+              dt.insert(vGrid[i][j]);
+          }
       }
+
+      // Computation of geometric properties for all points p in pointcloud:
+      // 1. distance:   Orthogonal point-plane distance of point p and corresponding triangle t from Dt.
+      // 2. alpha:      largest angle of angles between point p and the vectors that connect it to corresponding triangle t
+      // vertices.
+      int countComp = 0;
+      for (auto p: pointcloud) {
+          if (class_labels[countComp] != 2) {
+              DT::Face_handle triangle = dt.locate(p);
+
+              // The 3 vertices of the triangle:
+              DT::Vertex_handle v0 = triangle->vertex(0);
+              DT::Vertex_handle v1 = triangle->vertex(1);
+              DT::Vertex_handle v2 = triangle->vertex(2);
+
+              // Put points in appropriate triangle/plane object
+              Triangle located;
+              located = Triangle(v0->point(), v1->point(), v2->point());
+
+              // Orthogonal distance calculation
+              double dist = std::sqrt(CGAL::squared_distance(p, located));
+
+              if (dist < distance) {
+                  // Max angle calculation
+                  std::vector<double> betas;
+                  double beta1, beta2, beta3, alphamax;
+                  //alphamax = 0.;
+                  Point p0;
+                  Vector pv0, pv1, pv2, p0v0, p0v1, p0v2;
+
+
+
+                  pv0 = Vector(p, v0->point());
+                  pv1 = Vector(p, v1->point()), pv2 = Vector(p, v2->point());
+                  p0 = Point(p[0], p[1], p[2] - dist);
+                  p0v0 = Vector(p0, v0->point());
+                  p0v1 = Vector(p0, v1->point()), p0v2 = Vector(p0, v2->point());
+                  beta1 = std::acos((pv0 * p0v0) / ((std::sqrt(pv0.squared_length()) * std::sqrt(p0v0.squared_length()))));
+                  betas.push_back(beta1);
+                  beta2 = std::acos((pv1 * p0v1) / ((std::sqrt(pv1.squared_length()) * std::sqrt(p0v1.squared_length()))));
+                  betas.push_back(beta2);
+                  beta3 = std::acos((pv2 * p0v2) / ((std::sqrt(pv2.squared_length()) * std::sqrt(p0v2.squared_length()))));
+                  betas.push_back(beta3);
+                  auto it = std::max_element(betas.begin(), betas.end());
+                  alphamax = it[0] * 180 / M_PI;
+
+
+                  if (alphamax < angle) {
+                      dt.insert(p);
+                      class_labels[countComp] = 2;
+                  }
+              }
+          }
+          countComp++;
+      }
+
+      // Print number of ground points to console
+      int groundPoints = 0, otherPoints = 0;
+      for (auto label: class_labels) { if (label == 2) { groundPoints++; } else { otherPoints++; }}
+      std::cout << "Number of classified ground points:         " << groundPoints << "\n";
+      std::cout << "Number of other (non-ground) points:        " << otherPoints << "\n";
+      std::cout << "Sum:                                        " << groundPoints + otherPoints << "\n";
+      std::cout << "Original size pointcloud:                   " << pointcloud.size() << "\n";
+
+      // Write results to new LAS file
+      write_lasfile(jparams["output_las"], pointcloud, class_labels);
+
+      if (groundPoints == 0) {
+          std::cout << "ERROR: No ground points detected.\n Run again, and/or change parameters.\n";
+      }
+      stabilityCount++;
   }
 
-
-  // Initialise the Delaunay Triangulation (DT) object
-  DT dt;
-
-  // Insertion of initial ground points from vGrid into DT
-  for (int i=0; i < CELLROWS; i++) {
-      for (int j=0; j < CELLCOLS; j++) {
-          dt.insert(vGrid[i][j]);
-      }
-  }
-
-  // Computation of geometric properties for all points p in pointcloud:
-  // 1. distance:   Orthogonal point-plane distance of point p and corresponding triangle t from Dt.
-  // 2. alpha:      largest angle of angles between point p and the vectors that connect it to corresponding triangle t
-  // vertices.
-  int countComp = 0;
-  for (auto p : pointcloud) {
-      if (class_labels[countComp] != 2) {
-          DT::Face_handle triangle = dt.locate(p);
-
-          // The 3 vertices of the triangle:
-          DT::Vertex_handle v0 = triangle->vertex(0);
-          DT::Vertex_handle v1 = triangle->vertex(1);
-          DT::Vertex_handle v2 = triangle->vertex(2);
-
-          // Put points in appropriate triangle/plane object
-          Triangle located;
-          located = Triangle(v0->point(), v1->point(), v2->point());
-
-          // Orthogonal distance calculation
-          double dist = std::sqrt(CGAL::squared_distance(p, located));
-
-          // Max angle calculation
-          std::vector<double> betas;
-          double beta1, beta2, beta3, alphamax;
-          Point p0;
-          Vector pv0, pv1, pv2, p0v0, p0v1, p0v2;
-          pv0 = Vector(p, v0->point()); pv1 = Vector(p, v1->point()), pv2 = Vector(p, v2->point());
-          p0 = Point(p[0], p[1], p[2] - dist);
-          p0v0 = Vector(p0, v0->point()); p0v1 = Vector(p0, v1->point()), p0v2 = Vector(p0, v2->point());
-          beta1 = std::acos((pv0 * p0v0) / ((std::sqrt(pv0.squared_length()) * std::sqrt(p0v0.squared_length()))));
-          betas.push_back(beta1);
-          beta2 = std::acos((pv1 * p0v1) / ((std::sqrt(pv1.squared_length()) * std::sqrt(p0v1.squared_length()))));
-          betas.push_back(beta2);
-          beta3 = std::acos((pv2 * p0v2) / ((std::sqrt(pv2.squared_length()) * std::sqrt(p0v2.squared_length()))));
-          betas.push_back(beta3);
-          auto it = std::max_element(betas.begin(), betas.end());
-          alphamax = it[0]*180/M_PI;
-
-          if ((dist < distance) && (alphamax < angle)) {dt.insert(p); class_labels[countComp] = 2;}
-      }
-      countComp++;
-  }
-
-  // Print number of ground points to console
-  int groundPoints=0, otherPoints=0;
-  for (auto label : class_labels) {if (label == 2){groundPoints++;} else {otherPoints++;}}
-  std::cout << "Number of classified ground points:         " << groundPoints << "\n";
-  std::cout << "Number of other (non-ground) points:        " << otherPoints << "\n";
-  std::cout << "Sum:                                        " << groundPoints + otherPoints << "\n";
-  std::cout << "Original size pointcloud:                   " << pointcloud.size() << "\n";
-
-  // Write results to new LAS file
-  write_lasfile(jparams["output_las"], pointcloud, class_labels);
-
-  if (groundPoints == 0) {
-      std::cout << "ERROR: No ground points detected.\n Run again, and/or change parameters.\n";
-  }
 }
 
 void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams) {
@@ -857,7 +922,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
       Neighbor_search search_result(tree3d, query_point, N);
       for (auto res : search_result) {
           Point neighbour_point = res.first;
-          double distance = std::sqrt(res.second);
+          double distance = res.second;
           if (distance < epsilon_ground) {class_labels.push_back(2);}
           else {class_labels.push_back(1);}
       }

@@ -298,8 +298,8 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   double epsilon_zmax = jparams["epsilon_zmax"];
   double epsilon_ground = jparams["epsilon_ground"];
   std::string output_las = jparams["output_las"];
-  double displacement = 4;
-  double scaling = 1.;
+  double displacement = 1.5;
+  //double scaling = 0.8; // Unfortunately, scaling does not work in this version.
 
   // Create S inverted 3D and S 2D (for later use in kd-tree query).
   std::vector<Point> S3Dinverted;
@@ -392,6 +392,8 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
           }
       }
 
+      // Apply scaling (not operational)
+      //displacement = displacement * scaling;
       // internal forces, process once each set neighbours e of adjacent particles
       for (int i = 0; i < CELLROWS; i++) {
           for (int j = 0; j < CELLCOLS; j++) {
@@ -401,77 +403,77 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                          cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                          cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                         }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
                       // n3
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       //n4
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
 
@@ -481,58 +483,58 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
                       // n3
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
 
@@ -542,58 +544,58 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
                       // n3
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
 
@@ -603,58 +605,58 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
                       //n3
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
 
@@ -664,58 +666,58 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
                       // n3
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
                   } // 8
@@ -724,39 +726,39 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
 
@@ -766,39 +768,39 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i+1][j][3] == 0.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i+1][j][3] == 1.){
                           if (zParams[i+1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i+1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i+1][j][2] += displacement;
                           }
                           else if (zParams[i+1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i+1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i+1][j][2] -= displacement;
                           }
                       }
 
@@ -808,39 +810,39 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i][j+1][3] == 0.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j+1][3] == 1.){
                           if (zParams[i][j+1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j+1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j+1][2] += displacement;
                           }
                           else if (zParams[i][j+1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j+1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j+1][2] -= displacement;
                           }
                       }
 
@@ -850,39 +852,39 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
                       // n1
                       if (zParams[i][j-1][3] == 0.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i][j-1][3] == 1.){
                           if (zParams[i][j-1][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i][j-1][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i][j-1][2] += displacement;
                           }
                           else if (zParams[i][j-1][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i][j-1][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i][j-1][2] -= displacement;
                           }
                       }
                       // n2
                       if (zParams[i-1][j][3] == 0.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
                           }
                       }
                       if (zParams[i-1][j][3] == 1.){
                           if (zParams[i-1][j][2] < cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - scaling * displacement);
-                              zParams[i-1][j][2] += scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() - displacement);
+                              zParams[i-1][j][2] += displacement;
                           }
                           else if (zParams[i-1][j][2] > cloth[i][j].z()){
-                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + scaling * displacement);
-                              zParams[i-1][j][2] -= scaling * displacement;
+                              cloth[i][j] = Point(cloth[i][j].x(), cloth[i][j].y(), cloth[i][j].z() + displacement);
+                              zParams[i-1][j][2] -= displacement;
                           }
                       }
 
@@ -897,7 +899,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
               if ((zParams[i][j][2] - zParams[i][j][1]) == deltaZ){deltaZstopper++;}
           }
       }
-      if (deltaZstopper >= 500){break;}
+      if (deltaZstopper >= 500){break;} // Advised range: 500-1000. >1000 unstable or very slow, 500 most stable.
   }
 
   std::vector<Point> clothVec;
@@ -916,7 +918,7 @@ void groundfilter_csf(const std::vector<Point>& pointcloud, const json& jparams)
   Tree tree3d(clothVec.begin(), clothVec.end());
   for (auto p : S3Dinverted) {
       Point query_point = p;
-      Neighbor_search search_result(tree3d, query_point, N);
+      Neighbor_search search_result(tree, query_point, N);
       for (auto res : search_result) {
           Point neighbour_point = res.first;
           double distance = std::sqrt(res.second);
